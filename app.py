@@ -106,8 +106,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Constantes ────────────────────────────────────────────────────────────────
-DIMENSOES = ["Demandas", "Controle", "Suporte gerencial",
-             "Suporte entre pares", "Relacionamentos", "Papel", "Mudança"]
+DIMENSOES = ["Cargo", "Controle", "Demandas", "Relacionamentos",
+             "Apoio dos Colegas", "Apoio da Chefia", "Comunicação e Mudanças"]
 
 INTERP_PADRAO = {
     "Demandas": "",
@@ -155,14 +155,29 @@ def estilo(nome, **kw):
     return ParagraphStyle(nome, **base)
 
 def cor_escore(v):
-    return VERDE if v >= 70 else (AMARELO if v >= 50 else VERMELHO)
+    if v <= 20:  return colors.HexColor("#c0392b")
+    if v <= 40:  return VERMELHO
+    if v <= 60:  return AMARELO
+    if v <= 80:  return VERDE
+    return colors.HexColor("#1e8449")
 
 def hex_escore(v):
     h = cor_escore(v).hexval()
     return "#" + h[2:] if h.startswith("0x") else h
 
 def label_escore(v):
-    return "Favorável" if v >= 70 else ("Intermediário" if v >= 50 else "Crítico")
+    if v <= 20:  return "Crítico"
+    if v <= 40:  return "Ruim"
+    if v <= 60:  return "Médio"
+    if v <= 80:  return "Bom"
+    return "Excelente"
+
+def cor_label(v):
+    if v <= 20:  return colors.HexColor("#c0392b")
+    if v <= 40:  return colors.HexColor("#e74c3c")
+    if v <= 60:  return colors.HexColor("#f39c12")
+    if v <= 80:  return colors.HexColor("#27ae60")
+    return colors.HexColor("#1e8449")
 
 def hr_line():
     return HRFlowable(width="100%", thickness=1, color=AZUL_MEDIO,
@@ -189,9 +204,11 @@ def grafico_barras(resultados, titulo):
         ax.text(val + 1, bar.get_y() + bar.get_height() / 2,
                 str(val), va='center', fontsize=8, fontweight='bold')
     ax.legend(handles=[
-        mpatches.Patch(color="#27ae60", label="Favorável (>=70)"),
-        mpatches.Patch(color="#f39c12", label="Intermediário (50-69)"),
-        mpatches.Patch(color="#e74c3c", label="Crítico (<50)"),
+        mpatches.Patch(color="#1e8449", label="Excelente (81-100)"),
+        mpatches.Patch(color="#27ae60", label="Bom (61-80)"),
+        mpatches.Patch(color="#f39c12", label="Médio (41-60)"),
+        mpatches.Patch(color="#e74c3c", label="Ruim (21-40)"),
+        mpatches.Patch(color="#c0392b", label="Crítico (0-20)"),
     ], fontsize=7, loc="lower right")
     ax.set_title(titulo, fontsize=9, fontweight='bold', pad=8)
     plt.tight_layout()
@@ -307,6 +324,12 @@ def gerar_pdf_bytes(dados):
         "de maio de 2026.", S_BODY))
     story.append(Spacer(1,6))
     story.append(Paragraph(
+        "Riscos psicossociais são fatores relativos à organização, ao conteúdo e ao ambiente "
+        "de trabalho que, quando mal gerenciados, podem causar danos à saúde mental e física "
+        "dos trabalhadores — incluindo estresse ocupacional, síndrome de burnout, ansiedade "
+        "e depressão.", S_BODY))
+    story.append(Spacer(1,6))
+    story.append(Paragraph(
         f"Este laudo documenta a avaliação dos riscos psicossociais em <b>{dados['empresa']}</b>, "
         "em conformidade com os requisitos da NR-1/GRO.", S_BODY))
 
@@ -359,7 +382,7 @@ def gerar_pdf_bytes(dados):
         ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
     ])
     for i, (dim, val) in enumerate(dados["escores"].items(), 1):
-        res_ts.add("TEXTCOLOR",(2,i),(2,i),cor_escore(val))
+        res_ts.add("TEXTCOLOR",(2,i),(2,i),cor_label(val))
         res_ts.add("FONTNAME",(2,i),(2,i),"Helvetica-Bold")
     res_tb.setStyle(res_ts)
     story.append(res_tb)
@@ -519,21 +542,82 @@ def gerar_pdf_bytes(dados):
     story += secao("8.1 Como Incorporar ao PGR")
     for tit_o, txt_o in [
         ("Identificação do perigo",
-         "Registre os fatores psicossociais como perigos de natureza psicossocial no inventário de riscos do PGR."),
+         "Os fatores psicossociais avaliados (cargo, controle, demandas, relacionamentos, "
+         "apoio dos colegas, apoio da chefia e comunicação e mudanças) devem ser registrados "
+         "como <b>perigos de natureza psicossocial</b> no inventário de riscos do PGR, com "
+         "referência ao instrumento utilizado (HSE-IT) e à data de aplicação."),
         ("Classificação do risco",
-         "Crítico (&lt;50) = risco alto | Intermediário (50–69) = risco médio | Favorável (≥70) = risco baixo."),
+         "Utilize os escores obtidos para classificar a probabilidade e severidade do risco. "
+         "Dimensões com escore <b>Crítico (0–20)</b> ou <b>Ruim (21–40)</b> correspondem a "
+         "risco <b>alto</b>; <b>Médio (41–60)</b> a risco <b>médio</b>; "
+         "<b>Bom (61–80)</b> e <b>Excelente (81–100)</b> a risco <b>baixo</b>."),
         ("Medidas de controle",
-         "Transcreva as ações do Plano (Seção 7) para o campo de medidas de prevenção do PGR."),
+         "As ações do Plano (Seção 7) devem ser transcritas para o campo de "
+         "<i>medidas de prevenção e controle</i> do PGR, com responsável, prazo e "
+         "forma de monitoramento definidos."),
         ("Monitoramento e revisão",
-         "Reaplicação recomendada a cada 12 meses ou após mudanças organizacionais relevantes."),
-        ("Documentação",
-         "Arquive este laudo assinado, o formulário aplicado, os dados brutos e os registros das ações."),
+         "Recomenda-se reaplicação do HSE-IT a cada <b>12 meses</b> ou após mudanças "
+         "organizacionais relevantes. Os resultados devem ser comparados ao baseline "
+         "deste laudo e registrados como evidência de monitoramento no PGR."),
+        ("Documentação e evidências",
+         "Mantenha arquivados: este laudo assinado, o formulário aplicado, os dados brutos "
+         "anonimizados e os registros de ações implementadas. Esses documentos constituem "
+         "evidência perante fiscalização do MTE."),
     ]:
         story.append(KeepTogether([
             Paragraph(f"<b>{tit_o}</b>",
                 estilo(f"OT{tit_o[:4]}", fontName="Helvetica-Bold", fontSize=9, textColor=AZUL_MEDIO)),
             Paragraph(txt_o, S_BODY), Spacer(1,8),
         ]))
+
+    story += secao("8.2 Tabela de Riscos no Formato GRO")
+    story.append(Paragraph(
+        "A tabela abaixo está formatada para facilitar a transcrição direta ao inventário "
+        "de riscos do PGR, seguindo a estrutura do GRO (Gerenciamento de Riscos Ocupacionais):",
+        S_BODY))
+    story.append(Spacer(1,8))
+
+    def gro_cell(txt, bold=False):
+        return Paragraph(txt, estilo(f"GC{hash(txt)%9999}",
+            fontSize=7, leading=10,
+            fontName="Helvetica-Bold" if bold else "Helvetica"))
+
+    gro_rows = [[gro_cell(h, bold=True) for h in
+        ["Fonte / Fator","Perigo psicossocial","Possível dano",
+         "Medidas de controle","Prazo","Resp."]]]
+    gro_data = dados.get("gro", [
+        ("Organização do trabalho\n(Comunicação e Mudanças)",
+         "Ausência de comunicação prévia sobre mudanças organizacionais",
+         "Ansiedade, insegurança, resistência, adoecimento mental",
+         "Protocolo formal de comunicação de mudanças; canal de escuta das equipes",
+         "60 dias","Diretoria"),
+        ("Relação hierárquica\n(Apoio da Chefia)",
+         "Liderança sem práticas estruturadas de feedback e apoio",
+         "Burnout, desmotivação, absenteísmo",
+         "Programa de desenvolvimento de lideranças; 1:1 mensais; avaliação 360°",
+         "90 dias","RH"),
+        ("Conteúdo do trabalho\n(Cargo)",
+         "Ambiguidade e sobreposição de funções entre equipes",
+         "Estresse, conflito interpessoal, erros operacionais",
+         "Revisão de descrições de cargo; mapeamento de responsabilidades por equipe",
+         "120 dias","RH"),
+        ("Carga de trabalho\n(Demandas)",
+         "Picos de demanda com volume e prazos excessivos",
+         "Estresse, fadiga, erros, afastamentos",
+         "Monitoramento de horas extras; redistribuição de carga; planejamento de capacidade",
+         "90 dias","Gestão"),
+    ])
+    for r in gro_data:
+        gro_rows.append([gro_cell(c) for c in r])
+    gro = Table(gro_rows, colWidths=[2.8*cm,3.2*cm,3*cm,4.5*cm,1.5*cm,1.7*cm])
+    gro.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),AZUL_ESCURO),("TEXTCOLOR",(0,0),(-1,0),colors.white),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,AZUL_CLARO]),
+        ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING",(0,0),(-1,-1),5),("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
+    ]))
+    story.append(gro)
 
     # 9. ASSINATURAS
     story.append(Spacer(1,30))
@@ -581,6 +665,63 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Salvar / Carregar rascunho ────────────────────────────────────────────────
+def estado_para_json():
+    return json.dumps({
+        "empresa": st.session_state.get("empresa",""),
+        "cnpj": st.session_state.get("cnpj",""),
+        "setor_avaliado": st.session_state.get("setor_avaliado",""),
+        "data_aplicacao": st.session_state.get("data_aplicacao",""),
+        "total_colab": st.session_state.get("total_colab",""),
+        "total_resp": st.session_state.get("total_resp",""),
+        "taxa_resposta": st.session_state.get("taxa_resposta",""),
+        "cidade": st.session_state.get("cidade",""),
+        "n_minimo": st.session_state.get("n_minimo", 10),
+        "psi_nome": st.session_state.get("psi_nome",""),
+        "psi_crp": st.session_state.get("psi_crp",""),
+        "psi_consult": st.session_state.get("psi_consult",""),
+        "med_nome": st.session_state.get("med_nome",""),
+        "med_crm": st.session_state.get("med_crm",""),
+        "escores": st.session_state.get("escores", {d:65 for d in DIMENSOES}),
+        "interpretacoes": st.session_state.get("interpretacoes", {d:"" for d in DIMENSOES}),
+        "setores": st.session_state.get("setores", []),
+        "plano": st.session_state.get("plano", []),
+    }, ensure_ascii=False, indent=2)
+
+def json_para_estado(dados):
+    for k in ["empresa","cnpj","setor_avaliado","data_aplicacao","total_colab",
+              "total_resp","taxa_resposta","cidade","psi_nome","psi_crp",
+              "psi_consult","med_nome","med_crm"]:
+        if k in dados: st.session_state[k] = dados[k]
+    if "n_minimo"       in dados: st.session_state["n_minimo"]       = dados["n_minimo"]
+    if "escores"        in dados: st.session_state["escores"]        = dados["escores"]
+    if "interpretacoes" in dados: st.session_state["interpretacoes"] = dados["interpretacoes"]
+    if "setores"        in dados: st.session_state["setores"]        = dados["setores"]
+    if "plano"          in dados: st.session_state["plano"]          = dados["plano"]
+
+col_s1, col_s2, col_s3 = st.columns([1,1,4])
+with col_s1:
+    empresa_nome = st.session_state.get("empresa","rascunho") or "rascunho"
+    st.download_button(
+        "💾 Salvar rascunho",
+        data=estado_para_json(),
+        file_name=f"rascunho_{empresa_nome.replace(' ','_')}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+with col_s2:
+    uploaded = st.file_uploader("📂 Carregar rascunho", type="json",
+                                 label_visibility="collapsed")
+    if uploaded:
+        try:
+            dados_json = json.load(uploaded)
+            json_para_estado(dados_json)
+            st.success("Rascunho carregado!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao carregar: {e}")
+
+
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📋 Identificação",
     "📊 Escores Gerais",
@@ -622,7 +763,11 @@ with tab2:
     st.caption("Preencha com os valores calculados a partir das respostas coletadas.")
     for dim in DIMENSOES:
         val = st.session_state.escores.get(dim, 65)
-        cor = "🟢" if val >= 70 else ("🟡" if val >= 50 else "🔴")
+        if val <= 20:   cor = "🔴"
+        elif val <= 40: cor = "🟠"
+        elif val <= 60: cor = "🟡"
+        elif val <= 80: cor = "🟢"
+        else:           cor = "✅"
         lbl = label_escore(val)
         c1, c2 = st.columns([4,1])
         novo = c1.slider(f"{cor} **{dim}**", 0, 100, val, key=f"slider_{dim}")
@@ -635,7 +780,11 @@ with tab3:
     st.markdown('<div class="alert-box">⚠️ Preencha todas as sete dimensões. Campos vazios aparecerão como "(sem interpretação preenchida)" no laudo.</div>', unsafe_allow_html=True)
     for dim in DIMENSOES:
         val = st.session_state.escores.get(dim, 65)
-        cor = "🟢" if val >= 70 else ("🟡" if val >= 50 else "🔴")
+        if val <= 20:   cor = "🔴"
+        elif val <= 40: cor = "🟠"
+        elif val <= 60: cor = "🟡"
+        elif val <= 80: cor = "🟢"
+        else:           cor = "✅"
         txt = st.text_area(
             f"{cor} **{dim}** — Escore: {val} ({label_escore(val)})",
             st.session_state.interpretacoes.get(dim, ""),
