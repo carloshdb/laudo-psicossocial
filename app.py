@@ -301,7 +301,7 @@ def gerar_pdf_bytes(dados):
          Paragraph("Data de aplicação:", S_LABEL), Paragraph(dados["data_aplicacao"], S_BODY)],
         [Paragraph("Colaboradores:", S_LABEL),  Paragraph(dados["total_colab"], S_BODY),
          Paragraph("Respondentes:", S_LABEL),
-         Paragraph(f"{dados['total_resp']} ({dados['taxa_resposta']})", S_BODY)],
+         Paragraph(f"{dados['total_resp']} ({dados['taxa_resposta'] if '%' in str(dados['taxa_resposta']) else str(dados['taxa_resposta'])+'%'})", S_BODY)],
     ]
     id_tb = Table(id_rows, colWidths=[3.5*cm, 5*cm, 3.5*cm, 5*cm])
     id_tb.setStyle(TableStyle([
@@ -310,9 +310,19 @@ def gerar_pdf_bytes(dados):
         ("LEFTPADDING",(0,0),(-1,-1),8),
         ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
     ]))
-    story += [id_tb, Spacer(1,6),
-              Paragraph(f"Data do relatório: {datetime.today().strftime('%d/%m/%Y')} — {dados['cidade']}", S_SMALL),
-              Spacer(1,20)]
+    # Linha extra com data do relatório integrada
+    data_row = Table([
+        [Paragraph("Data do relatório:", S_LABEL),
+         Paragraph(f"{datetime.today().strftime('%d/%m/%Y')} — {dados['cidade']}", S_BODY),
+         Paragraph("", S_BODY), Paragraph("", S_BODY)],
+    ], colWidths=[3.5*cm, 5*cm, 3.5*cm, 5*cm])
+    data_row.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#eef3f8")),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),8),
+        ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
+    ]))
+    story += [id_tb, data_row, Spacer(1,20)]
 
     # 1. NR-1
     story += secao("1. Contextualização Legal — NR-1 e Riscos Psicossociais")
@@ -339,18 +349,18 @@ def gerar_pdf_bytes(dados):
     story.append(Paragraph(
         "O <b>HSE Indicator Tool (HSE-IT)</b> foi desenvolvido pelo Health and Safety Executive "
         "do Reino Unido. É um questionário validado internacionalmente, de domínio público, "
-        "aplicado de forma <b>anônima e voluntária</b> por meio de plataforma digital de coleta "
-        "anônima. Escores: <b>Favorável</b> (≥70) | <b>Intermediário</b> (50–69) | <b>Crítico</b> (&lt;50).",
-        S_BODY))
+        "amplamente utilizado em avaliações psicossociais ocupacionais, aplicado de forma "
+        "<b>anônima e voluntária</b> por meio de plataforma digital de coleta anônima, "
+        "cobrindo sete dimensões-chave:", S_BODY))
     story.append(Spacer(1,6))
     dim_rows = [["Dimensão", "O que avalia"]] + [
-        ["Demandas","Carga de trabalho, ritmo, horas, pressão por produção"],
-        ["Controle","Autonomia, participação nas decisões, ritmo de trabalho"],
-        ["Suporte gerencial","Incentivo, feedback e apoio das lideranças diretas"],
-        ["Suporte entre pares","Cooperação e apoio entre colegas"],
-        ["Relacionamentos","Conflitos interpessoais e comportamentos inaceitáveis"],
-        ["Papel","Clareza de função e ausência de conflito de papéis"],
-        ["Mudança","Comunicação e envolvimento nas mudanças organizacionais"],
+        ["Cargo","Clareza de função, adequação das responsabilidades e ausência de conflito de papéis"],
+        ["Controle","Autonomia, participação nas decisões e ritmo de trabalho"],
+        ["Demandas","Carga de trabalho, ritmo, horas e pressão por produção"],
+        ["Relacionamentos","Conflitos interpessoais e comportamentos inaceitáveis no trabalho"],
+        ["Apoio dos Colegas","Cooperação, suporte e senso de pertencimento entre pares"],
+        ["Apoio da Chefia","Incentivo, feedback e apoio das lideranças diretas"],
+        ["Comunicação e Mudanças","Transparência na comunicação e envolvimento nas mudanças organizacionais"],
     ]
     dt = Table(dim_rows, colWidths=[5.5*cm, 11.5*cm])
     dt.setStyle(TableStyle([
@@ -362,8 +372,11 @@ def gerar_pdf_bytes(dados):
         ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
     ]))
     story.append(dt)
-
-    # 3. RESULTADOS GERAIS
+    story.append(Spacer(1,8))
+    story.append(Paragraph(
+        "Escores de 0 a 100 por dimensão: "
+        "<b>Excelente</b> (81–100) | <b>Bom</b> (61–80) | <b>Médio</b> (41–60) | "
+        "<b>Ruim</b> (21–40) | <b>Crítico</b> (0–20).", S_BODY))
     story.append(PageBreak())
     story += secao("3. Resultados Gerais")
     story.append(grafico_barras(dados["escores"], "Resultados Gerais por Dimensão"))
@@ -409,26 +422,47 @@ def gerar_pdf_bytes(dados):
     # 5. LIMITAÇÕES
     story.append(PageBreak())
     story += secao("5. Limitações Metodológicas")
+    story.append(Paragraph(
+        "A apresentação transparente das limitações deste instrumento e desta aplicação "
+        "é parte integrante das boas práticas em saúde ocupacional e protege juridicamente "
+        "todos os responsáveis técnicos envolvidos.", S_BODY))
+    story.append(Spacer(1,10))
     AMARELO_BG = colors.HexColor("#fff8e1")
     AMARELO_BD = colors.HexColor("#f39c12")
+    taxa = dados["taxa_resposta"]
+    if "%" not in str(taxa): taxa = str(taxa) + "%"
     limitacoes = [
         ("Mensuração de percepção, não de diagnóstico clínico",
-         "O HSE-IT avalia a <i>percepção</i> dos colaboradores. Escores desfavoráveis não "
-         "constituem diagnóstico clínico individual — a avaliação clínica é competência "
-         "exclusiva de profissionais de saúde habilitados."),
+         "O HSE-IT avalia a <i>percepção</i> dos colaboradores sobre o ambiente psicossocial "
+         "de trabalho. Escores desfavoráveis indicam necessidade de investigação e intervenção, "
+         "mas não constituem diagnóstico clínico individual de transtorno mental. A avaliação "
+         "clínica de cada trabalhador é competência exclusiva de profissionais de saúde habilitados."),
         ("Viés de resposta e contexto da coleta",
-         f"Taxa de resposta abaixo de 70% aumenta o risco de viés de seleção. "
-         f"Nesta aplicação: <b>{dados['taxa_resposta']}</b>."),
+         "Respostas podem ser influenciadas pelo momento organizacional durante a aplicação "
+         "(período de reestruturação, demissões, campanhas internas, etc.), pelo grau de "
+         "confiança dos colaboradores no anonimato e pela adesão voluntária. Taxa de resposta "
+         f"abaixo de 70% aumenta o risco de viés de seleção. Nesta aplicação, a taxa foi de "
+         f"<b>{taxa}</b>."),
         ("Validade temporal",
-         f"Os resultados refletem o estado percebido em <b>{dados['data_aplicacao']}</b>. "
+         f"Os resultados refletem o estado percebido no período de coleta "
+         f"(<b>{dados['data_aplicacao']}</b>). Mudanças organizacionais relevantes ocorridas "
+         "após essa data podem alterar significativamente o panorama psicossocial. "
          "Recomenda-se reaplicação anual ou após eventos organizacionais de grande impacto."),
-        ("Ausência de normativos brasileiros consolidados",
-         "Os pontos de corte (50 e 70) seguem a convenção internacional do instrumento."),
+        ("Ausência de dados normativos brasileiros consolidados",
+         "O HSE-IT foi originalmente desenvolvido e normatizado no Reino Unido. Embora amplamente "
+         "utilizado no Brasil, ainda não existem tabelas normativas nacionais publicadas para "
+         "comparação setorial. Os pontos de corte adotados (em faixas de 20 pontos) são uma "
+         "convenção metodológica adotada nesta aplicação."),
         ("Limitações de anonimato em grupos pequenos",
-         f"Grupos com menos de <b>{n_min} respondentes</b> não têm escores publicados individualmente."),
-        ("Cobertura parcial dos fatores de risco",
-         "O HSE-IT abrange sete dimensões centrais, mas não cobre fatores como violência, "
-         "assédio ou condições físicas — que devem ser investigados por outros meios no PGR."),
+         f"Grupos com menos de <b>{n_min} respondentes</b> não têm escores publicados "
+         "individualmente neste laudo. Em amostras muito pequenas, mesmo com anonimato declarado, "
+         "colaboradores podem sentir-se identificáveis, comprometendo a sinceridade das respostas "
+         "e a representatividade dos resultados."),
+        ("O instrumento não cobre todos os fatores de risco",
+         "O HSE-IT abrange sete dimensões psicossociais centrais, mas não esgota o espectro "
+         "de riscos ocupacionais de natureza psicossocial. Fatores como violência no trabalho, "
+         "assédio moral ou sexual e condições físicas do ambiente devem ser investigados por "
+         "outros meios complementares no âmbito do PGR."),
     ]
     for tit, txt in limitacoes:
         bloco = Table([[Paragraph(f"<b>{tit}</b>",
@@ -464,7 +498,10 @@ def gerar_pdf_bytes(dados):
         story.append(PageBreak())
         story += secao("6. Resultados por Setor")
         story.append(Paragraph(
-            f"Apenas setores com n ≥ {n_min} são apresentados individualmente.", S_BODY))
+            f"Apenas setores com número de respondentes igual ou superior ao limiar mínimo "
+            f"({n_min}) são apresentados individualmente. Os gráficos abaixo permitem "
+            "identificar diferenças de exposição a riscos psicossociais entre os setores "
+            "avaliados, orientando ações focadas.", S_BODY))
         story.append(Spacer(1,8))
         story += secao("6.1 Visão Comparativa")
         story.append(grafico_heatmap(validos))
@@ -492,21 +529,32 @@ def gerar_pdf_bytes(dados):
                 ts2.add("TEXTCOLOR",(2,i),(2,i),cor_escore(v))
                 ts2.add("FONTNAME",(2,i),(2,i),"Helvetica-Bold")
             tb2.setStyle(ts2); story.append(tb2); story.append(Spacer(1,12))
-            crit  = [(d,v) for d,v in res.items() if v<50]
-            inter = [(d,v) for d,v in res.items() if 50<=v<70]
-            if crit:
-                story.append(Paragraph("<b>Dimensões críticas (&lt;50):</b>", S_BODY))
-                for d,v in crit:
-                    story.append(Paragraph(f"• <b>{d}</b> ({v}) — intervenção prioritária.", S_BODY))
+            critico = [(d,v) for d,v in res.items() if v<=20]
+            ruim    = [(d,v) for d,v in res.items() if 21<=v<=40]
+            medio   = [(d,v) for d,v in res.items() if 41<=v<=60]
+            if critico:
+                story.append(Paragraph("<b>Dimensões críticas (0–20) — intervenção imediata:</b>", S_BODY))
+                for d,v in critico:
+                    story.append(Paragraph(f"• <b>{d}</b> ({v}) — requer intervenção imediata neste setor.", S_BODY))
                 story.append(Spacer(1,6))
-            if inter:
-                story.append(Paragraph("<b>Dimensões intermediárias (50–69):</b>", S_BODY))
-                for d,v in inter:
-                    story.append(Paragraph(f"• <b>{d}</b> ({v}) — monitorar e prevenir.", S_BODY))
+            if ruim:
+                story.append(Paragraph("<b>Dimensões ruins (21–40) — intervenção prioritária:</b>", S_BODY))
+                for d,v in ruim:
+                    story.append(Paragraph(f"• <b>{d}</b> ({v}) — requer intervenção prioritária neste setor.", S_BODY))
+                story.append(Spacer(1,6))
+            if medio:
+                story.append(Paragraph("<b>Dimensões médias (41–60) — atenção preventiva:</b>", S_BODY))
+                for d,v in medio:
+                    story.append(Paragraph(f"• <b>{d}</b> ({v}) — monitorar e implantar melhorias preventivas.", S_BODY))
 
     # 7. PLANO DE AÇÃO
     story.append(PageBreak())
     story += secao("7. Plano de Ação Recomendado")
+    story.append(Paragraph(
+        "As recomendações abaixo foram priorizadas com base nos escores obtidos e nas "
+        "boas práticas de gestão de riscos psicossociais. Recomenda-se nova aplicação "
+        "do instrumento após a implementação para verificar a eficácia das ações.", S_BODY))
+    story.append(Spacer(1,8))
     def pa_cell(txt, bold=False, cor=None):
         st2 = estilo(f"PAC{hash(txt)%9999}", fontSize=7.5, leading=11)
         if bold: st2.fontName = "Helvetica-Bold"
@@ -539,18 +587,30 @@ def gerar_pdf_bytes(dados):
     # 8. PGR / SESMT
     story.append(PageBreak())
     story += secao("8. Orientações para Inserção no PGR — SESMT")
+    story.append(Paragraph(
+        "Esta seção destina-se ao SESMT (Serviço Especializado em Engenharia de Segurança e "
+        "em Medicina do Trabalho) e apresenta orientações objetivas para a incorporação dos "
+        "riscos psicossociais identificados ao <b>Programa de Gerenciamento de Riscos (PGR)</b>, "
+        "conforme exigido pela NR-1/GRO.", S_BODY))
+    story.append(Spacer(1,10))
+
     story += secao("8.1 Como Incorporar ao PGR")
     for tit_o, txt_o in [
         ("Identificação do perigo",
-         "Os fatores psicossociais avaliados (cargo, controle, demandas, relacionamentos, "
-         "apoio dos colegas, apoio da chefia e comunicação e mudanças) devem ser registrados "
+         "Os fatores psicossociais avaliados — Cargo, Controle, Demandas, Relacionamentos, "
+         "Apoio dos Colegas, Apoio da Chefia e Comunicação e Mudanças — devem ser registrados "
          "como <b>perigos de natureza psicossocial</b> no inventário de riscos do PGR, com "
          "referência ao instrumento utilizado (HSE-IT) e à data de aplicação."),
-        ("Classificação do risco",
-         "Utilize os escores obtidos para classificar a probabilidade e severidade do risco. "
-         "Dimensões com escore <b>Crítico (0–20)</b> ou <b>Ruim (21–40)</b> correspondem a "
-         "risco <b>alto</b>; <b>Médio (41–60)</b> a risco <b>médio</b>; "
-         "<b>Bom (61–80)</b> e <b>Excelente (81–100)</b> a risco <b>baixo</b>."),
+        ("Uso dos escores como indicador de probabilidade",
+         "Os escores por dimensão representam o nível de exposição percebida ao fator "
+         "psicossocial e podem ser utilizados como indicador de <b>probabilidade</b> na "
+         "matriz de risco do PGR. A conversão depende do formato da matriz adotada pelo SESMT:"),
+        ("Severidade — julgamento do SESMT",
+         "A severidade do risco é de julgamento exclusivo dos profissionais do SESMT, "
+         "considerando o contexto da empresa, o histórico de saúde dos trabalhadores, a "
+         "natureza das atividades e outras fontes do PGR (PCMSO, atestados, afastamentos, "
+         "NR-17, etc.). Recomenda-se que dimensões com escore abaixo de 40 sejam discutidas "
+         "pelos profissionais do SESMT responsáveis antes da classificação final de risco."),
         ("Medidas de controle",
          "As ações do Plano (Seção 7) devem ser transcritas para o campo de "
          "<i>medidas de prevenção e controle</i> do PGR, com responsável, prazo e "
@@ -566,57 +626,102 @@ def gerar_pdf_bytes(dados):
     ]:
         story.append(KeepTogether([
             Paragraph(f"<b>{tit_o}</b>",
-                estilo(f"OT{tit_o[:4]}", fontName="Helvetica-Bold", fontSize=9, textColor=AZUL_MEDIO)),
+                estilo(f"OT{hash(tit_o)%9999}", fontName="Helvetica-Bold",
+                       fontSize=9, textColor=AZUL_MEDIO)),
             Paragraph(txt_o, S_BODY), Spacer(1,8),
         ]))
 
-    story += secao("8.2 Tabela de Riscos no Formato GRO")
+    # Tabela de conversão de escores por tipo de matriz
+    story.append(Spacer(1,4))
+    def mc(txt, bold=False, center=False):
+        return Paragraph(txt, estilo(f"MC{hash(txt)%9999}", fontSize=8, leading=11,
+            fontName="Helvetica-Bold" if bold else "Helvetica",
+            alignment=TA_CENTER if center else TA_JUSTIFY))
+
+    matriz_rows = [
+        [mc("Matriz",True,True), mc("Intervalos de escore",True,True),
+         mc("Nível de probabilidade sugerido",True,True)],
+        [mc("3×3",True,True), mc("0–33 / 34–66 / 67–100",center=True),
+         mc("Alta / Média / Baixa",center=True)],
+        [mc("4×4",True,True), mc("0–25 / 26–50 / 51–75 / 76–100",center=True),
+         mc("Alta / Média-alta / Média-baixa / Baixa",center=True)],
+        [mc("5×5",True,True), mc("0–20 / 21–40 / 41–60 / 61–80 / 81–100",center=True),
+         mc("Muito alta / Alta / Média / Baixa / Muito baixa",center=True)],
+    ]
+    mt = Table(matriz_rows, colWidths=[2*cm, 6.5*cm, 8.5*cm])
+    mt.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),AZUL_ESCURO),("TEXTCOLOR",(0,0),(-1,0),colors.white),
+        ("BACKGROUND",(0,1),(0,-1),AZUL_CLARO),
+        ("ROWBACKGROUNDS",(1,1),(-1,-1),[colors.white,colors.HexColor("#f8fafc")]),
+        ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING",(0,0),(-1,-1),8),("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
+        ("FONTNAME",(0,1),(0,-1),"Helvetica-Bold"),
+    ]))
+    story.append(mt)
+    story.append(Spacer(1,12))
+
+    story += secao("8.2 Tabela de Riscos no Formato GRO — Exemplo Ilustrativo")
     story.append(Paragraph(
-        "A tabela abaixo está formatada para facilitar a transcrição direta ao inventário "
-        "de riscos do PGR, seguindo a estrutura do GRO (Gerenciamento de Riscos Ocupacionais):",
-        S_BODY))
+        "A tabela abaixo é um <b>exemplo ilustrativo</b> para orientar a estruturação dos "
+        "registros no inventário de riscos do PGR, seguindo a estrutura do GRO. "
+        "Os perigos, agravos à saúde e medidas de controle devem ser revisados e adaptados "
+        "pelo SESMT conforme a realidade da organização, podendo ser complementados com "
+        "outras fontes do PGR (PCMSO, NR-17, CIPA, etc.).", S_BODY))
     story.append(Spacer(1,8))
 
-    def gro_cell(txt, bold=False):
+    def gro_cell(txt, bold=False, italic=False):
+        fn = "Helvetica-Bold" if bold else "Helvetica-Oblique" if italic else "Helvetica"
         return Paragraph(txt, estilo(f"GC{hash(txt)%9999}",
-            fontSize=7, leading=10,
-            fontName="Helvetica-Bold" if bold else "Helvetica"))
+            fontSize=7, leading=10, fontName=fn))
 
+    CINZA_ITER = colors.HexColor("#f0f0f0")
     gro_rows = [[gro_cell(h, bold=True) for h in
-        ["Fonte / Fator","Perigo psicossocial","Possível dano",
-         "Medidas de controle","Prazo","Resp."]]]
-    gro_data = dados.get("gro", [
-        ("Organização do trabalho\n(Comunicação e Mudanças)",
+        ["Fonte / Fator de Risco","Perigo Psicossocial","Possível Agravo à Saúde",
+         "Medidas de Prevenção e Controle","Prazo","Resp."]]]
+
+    gro_exemplos = [
+        ("Organização do trabalho (Comunicação e Mudanças)",
          "Ausência de comunicação prévia sobre mudanças organizacionais",
-         "Ansiedade, insegurança, resistência, adoecimento mental",
-         "Protocolo formal de comunicação de mudanças; canal de escuta das equipes",
-         "60 dias","Diretoria"),
-        ("Relação hierárquica\n(Apoio da Chefia)",
-         "Liderança sem práticas estruturadas de feedback e apoio",
+         "Ansiedade, insegurança, adoecimento mental",
+         "Protocolo de comunicação de mudanças; canal de escuta das equipes",
+         "60 dias", "Diretoria"),
+        ("Relação hierárquica (Apoio da Chefia)",
+         "Liderança sem práticas estruturadas de apoio e feedback",
          "Burnout, desmotivação, absenteísmo",
-         "Programa de desenvolvimento de lideranças; 1:1 mensais; avaliação 360°",
-         "90 dias","RH"),
-        ("Conteúdo do trabalho\n(Cargo)",
-         "Ambiguidade e sobreposição de funções entre equipes",
-         "Estresse, conflito interpessoal, erros operacionais",
-         "Revisão de descrições de cargo; mapeamento de responsabilidades por equipe",
-         "120 dias","RH"),
-        ("Carga de trabalho\n(Demandas)",
-         "Picos de demanda com volume e prazos excessivos",
-         "Estresse, fadiga, erros, afastamentos",
-         "Monitoramento de horas extras; redistribuição de carga; planejamento de capacidade",
-         "90 dias","Gestão"),
-    ])
-    for r in gro_data:
-        gro_rows.append([gro_cell(c) for c in r])
-    gro = Table(gro_rows, colWidths=[2.8*cm,3.2*cm,3*cm,4.5*cm,1.5*cm,1.7*cm])
-    gro.setStyle(TableStyle([
+         "Programa de desenvolvimento de lideranças; 1:1 mensais",
+         "90 dias", "RH"),
+        ("Conteúdo do trabalho (Cargo)",
+         "Ambiguidade de funções e sobreposição de responsabilidades",
+         "Estresse, conflito interpessoal",
+         "Revisão de descrições de cargo; mapeamento de responsabilidades",
+         "120 dias", "RH"),
+        ("Carga de trabalho (Demandas)",
+         "Volume e prazos excessivos em períodos de pico",
+         "Fadiga, erros, afastamentos",
+         "Monitoramento de horas extras; redistribuição de carga",
+         "90 dias", "Gestão"),
+    ]
+    for r in gro_exemplos:
+        gro_rows.append([gro_cell(cel) for cel in r])
+
+    # 2 linhas em branco para o SESMT preencher
+    for _ in range(2):
+        gro_rows.append([gro_cell("A preencher pelo SESMT", italic=True)] * 6)
+
+    gro = Table(gro_rows, colWidths=[3*cm, 3.2*cm, 2.8*cm, 4*cm, 1.5*cm, 1.2*cm])
+    gro_ts = TableStyle([
         ("BACKGROUND",(0,0),(-1,0),AZUL_ESCURO),("TEXTCOLOR",(0,0),(-1,0),colors.white),
         ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,AZUL_CLARO]),
         ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
         ("LEFTPADDING",(0,0),(-1,-1),5),("VALIGN",(0,0),(-1,-1),"TOP"),
         ("GRID",(0,0),(-1,-1),0.3,CINZA_LINHA),("BOX",(0,0),(-1,-1),0.5,AZUL_MEDIO),
-    ]))
+        # Linhas "a preencher" em itálico e fundo diferente
+        ("BACKGROUND",(0,5),(-1,6),CINZA_ITER),
+        ("TEXTCOLOR",(0,5),(-1,6),colors.HexColor("#888888")),
+    ])
+    gro.setStyle(gro_ts)
     story.append(gro)
 
     # 9. ASSINATURAS
@@ -641,16 +746,28 @@ def gerar_pdf_bytes(dados):
     ]))
     story.append(ass)
 
-    def rodape(canvas, doc):
+    def cabecalho_rodape(canvas, doc):
         canvas.saveState()
+        w, h = A4
+        # Cabeçalho — só a partir da página 2
+        if doc.page > 1:
+            canvas.setFont("Helvetica", 7.5)
+            canvas.setFillColor(colors.HexColor("#555555"))
+            consult = dados.get("psi_consult", "").strip()
+            if consult:
+                canvas.drawString(2.5*cm, h - 1.5*cm, consult)
+            canvas.drawRightString(w - 2.5*cm, h - 1.5*cm, "Laudo Psicossocial HSE-IT")
+            canvas.setStrokeColor(colors.HexColor("#dddddd"))
+            canvas.setLineWidth(0.5)
+            canvas.line(2.5*cm, h - 1.7*cm, w - 2.5*cm, h - 1.7*cm)
+        # Rodapé — todas as páginas
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(colors.HexColor("#888888"))
-        w, _ = A4
         canvas.drawCentredString(w/2, 1.2*cm,
             f"Laudo de Avaliação Psicossocial – {dados['empresa']} | HSE-IT | Pág. {doc.page}")
         canvas.restoreState()
 
-    doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
+    doc.build(story, onFirstPage=cabecalho_rodape, onLaterPages=cabecalho_rodape)
     buf.seek(0)
     return buf.read()
 
@@ -814,11 +931,18 @@ with tab4:
             n_min = st.session_state.n_minimo
             if setor["n"] > 0 and setor["n"] < n_min:
                 st.markdown(f'<div class="alert-box">⚠️ Este setor tem {setor["n"]} respondente(s) — abaixo do mínimo de {n_min}. Será suprimido automaticamente do laudo.</div>', unsafe_allow_html=True)
-            cols = st.columns(len(DIMENSOES))
-            for j, dim in enumerate(DIMENSOES):
-                setor["escores"][dim] = cols[j].number_input(
-                    dim[:6], 0, 100, setor["escores"].get(dim, 65),
+            # Linha 1: primeiras 4 dimensões
+            cols1 = st.columns(4)
+            for j, dim in enumerate(DIMENSOES[:4]):
+                setor["escores"][dim] = cols1[j].number_input(
+                    dim, 0, 100, setor["escores"].get(dim, 65),
                     key=f"s_{i}_{j}")
+            # Linha 2: últimas 3 dimensões (+ coluna vazia para alinhar)
+            cols2 = st.columns(4)
+            for j, dim in enumerate(DIMENSOES[4:]):
+                setor["escores"][dim] = cols2[j].number_input(
+                    dim, 0, 100, setor["escores"].get(dim, 65),
+                    key=f"s_{i}_{j+4}")
 
 # ── ABA 5: PLANO DE AÇÃO ─────────────────────────────────────────────────────
 with tab5:
