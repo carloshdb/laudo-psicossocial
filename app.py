@@ -310,6 +310,8 @@ def init_state():
         "interpretacoes": {d: "" for d in DIMENSOES},
         "setores": [],      # lista de dicts {nome, n, escores}
         "plano": [],        # lista de dicts {dim, prior, acao, resp, prazo}
+        "regen_interp_gen": 0,   # contador para forçar recriação dos widgets de interpretação
+        "regen_plano_gen":  0,   # contador para forçar recriação dos widgets do plano
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1482,9 +1484,11 @@ with tab3:
     st.markdown('<div class="alert-box">⚠️ Os textos abaixo foram gerados automaticamente com base nos escores. Revise e edite antes de gerar o PDF.</div>', unsafe_allow_html=True)
 
     if st.button("🔄 Regenerar interpretações com escores atuais", key="btn_regen_interp"):
-        st.session_state.interpretacoes = {}
+        st.session_state.interpretacoes = {d: "" for d in DIMENSOES}
+        st.session_state.regen_interp_gen += 1
         st.rerun()
 
+    gen_i = st.session_state.regen_interp_gen
     for dim in DIMENSOES:
         val = st.session_state.escores.get(dim, 65)
         if val <= 20:   cor = "🔴"
@@ -1492,13 +1496,12 @@ with tab3:
         elif val <= 60: cor = "🟡"
         elif val <= 80: cor = "🟢"
         else:           cor = "✅"
-        # Usar texto automático como default se campo ainda estiver vazio
         texto_atual = st.session_state.interpretacoes.get(dim, "")
         texto_default = texto_atual if texto_atual else texto_automatico(dim, val)
         txt = st.text_area(
             f"{cor} **{dim}** — Escore: {val} ({label_escore(val)})",
             texto_default,
-            height=120, key=f"interp_{dim}"
+            height=120, key=f"interp_{dim}_g{gen_i}"
         )
         st.session_state.interpretacoes[dim] = txt
 
@@ -1544,6 +1547,7 @@ with tab5:
 
     if st.button("🔄 Regenerar plano de ação com escores atuais", key="btn_regen_plano"):
         st.session_state.plano = []
+        st.session_state.regen_plano_gen += 1
         st.rerun()
 
     # Gerar plano automático se ainda estiver vazio
@@ -1567,9 +1571,10 @@ with tab5:
                     plano_auto.append({"dim": dim, "prior": "Baixa", "acao": acao, "resp": "", "prazo": ""})
         st.session_state.plano = plano_auto
 
+    gen_p = st.session_state.regen_plano_gen
     n_acoes = st.number_input("Quantas ações deseja incluir?", 0, 50,
                                max(1, len(st.session_state.plano)) if st.session_state.plano else 3,
-                               key="n_acoes_input")
+                               key=f"n_acoes_input_g{gen_p}")
     while len(st.session_state.plano) < n_acoes:
         st.session_state.plano.append({"dim":"","prior":"Alta","acao":"","resp":"","prazo":""})
     st.session_state.plano = st.session_state.plano[:n_acoes]
@@ -1577,14 +1582,14 @@ with tab5:
     for i, row in enumerate(st.session_state.plano):
         with st.expander(f"Ação {i+1}: {row['dim'] or '(sem dimensão)'}", expanded=(i<3)):
             c1, c2 = st.columns([2,1])
-            row["dim"]   = c1.text_input("Dimensão", row["dim"], key=f"p_dim_{i}")
+            row["dim"]   = c1.text_input("Dimensão", row["dim"], key=f"p_dim_{i}_g{gen_p}")
             row["prior"] = c2.selectbox("Prioridade", ["Alta","Média","Baixa"],
                                          ["Alta","Média","Baixa"].index(row["prior"]) if row["prior"] in ["Alta","Média","Baixa"] else 0,
-                                         key=f"p_prior_{i}")
-            row["acao"]  = st.text_area("Ação recomendada", row["acao"], height=80, key=f"p_acao_{i}")
+                                         key=f"p_prior_{i}_g{gen_p}")
+            row["acao"]  = st.text_area("Ação recomendada", row["acao"], height=80, key=f"p_acao_{i}_g{gen_p}")
             c3, c4 = st.columns(2)
-            row["resp"]  = c3.text_input("Responsável", row["resp"], key=f"p_resp_{i}")
-            row["prazo"] = c4.text_input("Prazo", row["prazo"], key=f"p_prazo_{i}", placeholder="Ex: 90 dias")
+            row["resp"]  = c3.text_input("Responsável", row["resp"], key=f"p_resp_{i}_g{gen_p}")
+            row["prazo"] = c4.text_input("Prazo", row["prazo"], key=f"p_prazo_{i}_g{gen_p}", placeholder="Ex: 90 dias")
 
 # ── BOTÃO GERAR PDF ───────────────────────────────────────────────────────────
 st.divider()
