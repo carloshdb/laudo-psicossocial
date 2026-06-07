@@ -640,9 +640,9 @@ def gerar_pdf_bytes(dados):
             "os escores dimensionais do HSE-IT. A questão 36 mensura a satisfação geral com "
             "o trabalho e a questão 37 avalia a autopercepção de saúde dos respondentes. "
             "Ambas utilizam escala Likert de 5 pontos, e seus resultados são convertidos para "
-            "a mesma escala de 0 a 100 utilizada nas sete dimensões, facilitando a comparação. "
-            "Os escores são classificados nas mesmas faixas: Excelente (81–100), Bom (61–80), "
-            "Médio (41–60), Ruim (21–40) e Crítico (0–20).",
+            "a escala de 0 a 100. Os escores são classificados em cinco faixas: "
+            "Muito Favorável (81–100), Favorável (61–80), Neutro (41–60), "
+            "Desfavorável (21–40) e Muito Desfavorável (0–20).",
             S_BODY))
         story.append(Spacer(1, 8))
 
@@ -650,6 +650,14 @@ def gerar_pdf_bytes(dados):
             """Converte média 1–5 para escore 0–100."""
             if v <= 0: return 0.0
             return round((v - 1) / 4 * 100, 1)
+
+        def label_desfecho_pdf(pct):
+            if pct == 0:    return "—"
+            if pct <= 20:   return "Muito Desfavorável"
+            if pct <= 40:   return "Desfavorável"
+            if pct <= 60:   return "Neutro"
+            if pct <= 80:   return "Favorável"
+            return "Muito Favorável"
 
         def_rows = [[
             Paragraph(h, estilo(f"DFH{i}", fontName="Helvetica-Bold", fontSize=9,
@@ -669,7 +677,7 @@ def gerar_pdf_bytes(dados):
                     Paragraph(f"{q_val:.1f}", estilo(f"DFM{q_num}", fontSize=9, alignment=TA_CENTER)),
                     Paragraph(f"{escore:.0f}", estilo(f"DFV{q_num}", fontName="Helvetica-Bold",
                               fontSize=9, textColor=cor_label(escore), alignment=TA_CENTER)),
-                    Paragraph(label_escore(escore), estilo(f"DFL{q_num}", fontName="Helvetica-Bold",
+                    Paragraph(label_desfecho_pdf(escore), estilo(f"DFL{q_num}", fontName="Helvetica-Bold",
                               fontSize=9, textColor=cor_label(escore), alignment=TA_CENTER)),
                 ])
 
@@ -1416,42 +1424,6 @@ with tab1:
                                                        value=st.session_state.n_minimo)
     st.markdown('<div class="info-box">💡 Setores com menos respondentes que o N mínimo serão suprimidos automaticamente do laudo para preservar o anonimato.</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="section-header">Indicadores de Desfecho (Q36 e Q37)</div>', unsafe_allow_html=True)
-    st.caption("Informe a média das respostas coletadas. Escala: 1 = Muito ruim / 2 = Ruim / 3 = Razoável / 4 = Bom / 5 = Muito bom")
-    cq1, cq2 = st.columns(2)
-    st.session_state.q36 = cq1.number_input(
-        "Q36 — Satisfação geral com o trabalho (média)",
-        min_value=0.0, max_value=5.0, step=0.1,
-        value=float(st.session_state.q36),
-        format="%.1f",
-        help="De maneira geral, pensando no seu trabalho, quão satisfeito você está com ele como um todo?"
-    )
-    st.session_state.q37 = cq2.number_input(
-        "Q37 — Autopercepção de saúde (média)",
-        min_value=0.0, max_value=5.0, step=0.1,
-        value=float(st.session_state.q37),
-        format="%.1f",
-        help="Em geral, sente que a sua saúde é:"
-    )
-    if st.session_state.q36 > 0 or st.session_state.q37 > 0:
-        def media_para_pct(v):
-            if v <= 0: return 0.0
-            return round((v - 1) / 4 * 100, 1)
-        def interp_desfecho(v):
-            if v == 0: return "—"
-            if v <= 2: return "Desfavorável"
-            if v <= 3: return "Neutro"
-            return "Favorável"
-        p36 = media_para_pct(st.session_state.q36)
-        p37 = media_para_pct(st.session_state.q37)
-        st.markdown(
-            f'<div class="info-box">'
-            f'Q36: média <b>{st.session_state.q36:.1f}</b> → <b>{p36:.0f}%</b> ({interp_desfecho(st.session_state.q36)}) &nbsp;|&nbsp; '
-            f'Q37: média <b>{st.session_state.q37:.1f}</b> → <b>{p37:.0f}%</b> ({interp_desfecho(st.session_state.q37)})'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-
     st.markdown('<div class="section-header">Responsáveis Técnicos</div>', unsafe_allow_html=True)
     c9, c10 = st.columns([2,1])
     st.session_state.psi_nome    = c9.text_input("Nome da psicóloga *", st.session_state.psi_nome)
@@ -1477,6 +1449,47 @@ with tab2:
         novo = c1.slider(f"{cor} **{dim}**", 0, 100, val, key=f"slider_{dim}")
         c2.metric("", f"{novo}", lbl)
         st.session_state.escores[dim] = novo
+
+    st.markdown('<div class="section-header">Indicadores de Desfecho (Q36 e Q37)</div>', unsafe_allow_html=True)
+    st.caption("Informe a média das respostas coletadas. Escala: 1 = Muito ruim / 2 = Ruim / 3 = Razoável / 4 = Bom / 5 = Muito bom")
+
+    def media_para_pct(v):
+        if v <= 0: return 0.0
+        return round((v - 1) / 4 * 100, 1)
+
+    def label_desfecho(pct):
+        if pct == 0:    return "—"
+        if pct <= 20:   return "Muito Desfavorável"
+        if pct <= 40:   return "Desfavorável"
+        if pct <= 60:   return "Neutro"
+        if pct <= 80:   return "Favorável"
+        return "Muito Favorável"
+
+    cq1, cq2 = st.columns(2)
+    st.session_state.q36 = cq1.number_input(
+        "Q36 — Satisfação geral com o trabalho (média)",
+        min_value=0.0, max_value=5.0, step=0.1,
+        value=float(st.session_state.q36),
+        format="%.1f",
+        help="De maneira geral, pensando no seu trabalho, quão satisfeito você está com ele como um todo?"
+    )
+    st.session_state.q37 = cq2.number_input(
+        "Q37 — Autopercepção de saúde (média)",
+        min_value=0.0, max_value=5.0, step=0.1,
+        value=float(st.session_state.q37),
+        format="%.1f",
+        help="Em geral, sente que a sua saúde é:"
+    )
+    if st.session_state.q36 > 0 or st.session_state.q37 > 0:
+        p36 = media_para_pct(st.session_state.q36)
+        p37 = media_para_pct(st.session_state.q37)
+        st.markdown(
+            f'<div class="info-box">'
+            f'Q36: média <b>{st.session_state.q36:.1f}</b> → <b>{p36:.0f}%</b> ({label_desfecho(p36)}) &nbsp;|&nbsp; '
+            f'Q37: média <b>{st.session_state.q37:.1f}</b> → <b>{p37:.0f}%</b> ({label_desfecho(p37)})'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
 # ── ABA 3: INTERPRETAÇÕES ─────────────────────────────────────────────────────
 with tab3:
@@ -1553,16 +1566,16 @@ with tab5:
     # Gerar plano automático se ainda estiver vazio
     if not st.session_state.plano:
         plano_auto = []
-        prior_map = {True: "Alta", False: "Média"}  # crítico/ruim → Alta; médio → Média
+        # Primeira passagem: dimensões que precisam de intervenção (≤ 60), em ordem canônica
         for dim in DIMENSOES:
             val = st.session_state.escores.get(dim, 65)
             if val > 60:
-                continue  # bom/excelente: só 1 ação de monitoramento
+                continue
             acoes_list = acoes_automaticas(dim, val)
             prior = "Alta" if val <= 40 else "Média"
             for acao in acoes_list:
                 plano_auto.append({"dim": dim, "prior": prior, "acao": acao, "resp": "", "prazo": ""})
-        # Adicionar monitoramento para dimensões boas/excelentes
+        # Segunda passagem: dimensões boas/excelentes (monitoramento), em ordem canônica
         for dim in DIMENSOES:
             val = st.session_state.escores.get(dim, 65)
             if val > 60:
