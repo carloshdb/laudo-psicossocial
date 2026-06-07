@@ -1480,6 +1480,11 @@ with tab2:
 with tab3:
     st.markdown('<div class="section-header">Análise Qualitativa por Dimensão</div>', unsafe_allow_html=True)
     st.markdown('<div class="alert-box">⚠️ Os textos abaixo foram gerados automaticamente com base nos escores. Revise e edite antes de gerar o PDF.</div>', unsafe_allow_html=True)
+
+    if st.button("🔄 Regenerar interpretações com escores atuais", key="btn_regen_interp"):
+        st.session_state.interpretacoes = {}
+        st.rerun()
+
     for dim in DIMENSOES:
         val = st.session_state.escores.get(dim, 65)
         if val <= 20:   cor = "🔴"
@@ -1536,6 +1541,10 @@ with tab4:
 with tab5:
     st.markdown('<div class="section-header">Plano de Ação Recomendado</div>', unsafe_allow_html=True)
     st.markdown('<div class="info-box">💡 O plano abaixo foi gerado automaticamente com base nos escores das dimensões. Edite, remova ou acrescente ações conforme necessário.</div>', unsafe_allow_html=True)
+
+    if st.button("🔄 Regenerar plano de ação com escores atuais", key="btn_regen_plano"):
+        st.session_state.plano = []
+        st.rerun()
 
     # Gerar plano automático se ainda estiver vazio
     if not st.session_state.plano:
