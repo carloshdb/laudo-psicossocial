@@ -1566,21 +1566,23 @@ with tab5:
     # Gerar plano automático se ainda estiver vazio
     if not st.session_state.plano:
         plano_auto = []
-        # Primeira passagem: dimensões que precisam de intervenção (≤ 60), em ordem canônica
+        # Passagem 1 — Alta: escore ≤ 40, em ordem canônica
+        for dim in DIMENSOES:
+            val = st.session_state.escores.get(dim, 65)
+            if val <= 40:
+                for acao in acoes_automaticas(dim, val):
+                    plano_auto.append({"dim": dim, "prior": "Alta", "acao": acao, "resp": "", "prazo": ""})
+        # Passagem 2 — Média: escore 41–60, em ordem canônica
+        for dim in DIMENSOES:
+            val = st.session_state.escores.get(dim, 65)
+            if 41 <= val <= 60:
+                for acao in acoes_automaticas(dim, val):
+                    plano_auto.append({"dim": dim, "prior": "Média", "acao": acao, "resp": "", "prazo": ""})
+        # Passagem 3 — Baixa: escore > 60 (monitoramento), em ordem canônica
         for dim in DIMENSOES:
             val = st.session_state.escores.get(dim, 65)
             if val > 60:
-                continue
-            acoes_list = acoes_automaticas(dim, val)
-            prior = "Alta" if val <= 40 else "Média"
-            for acao in acoes_list:
-                plano_auto.append({"dim": dim, "prior": prior, "acao": acao, "resp": "", "prazo": ""})
-        # Segunda passagem: dimensões boas/excelentes (monitoramento), em ordem canônica
-        for dim in DIMENSOES:
-            val = st.session_state.escores.get(dim, 65)
-            if val > 60:
-                acoes_list = acoes_automaticas(dim, val)
-                for acao in acoes_list:
+                for acao in acoes_automaticas(dim, val):
                     plano_auto.append({"dim": dim, "prior": "Baixa", "acao": acao, "resp": "", "prazo": ""})
         st.session_state.plano = plano_auto
 
